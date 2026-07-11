@@ -105,6 +105,7 @@
 
 body {
   margin: 0;
+  overflow: hidden;
   min-height: 100vh;
   color: var(--ink);
   font-family: var(--font-body);
@@ -145,13 +146,17 @@ button {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 300px minmax(460px, 1fr) 380px;
-  gap: 18px;
-  min-height: 100vh;
-  padding: 18px;
+  grid-template-columns: clamp(260px, 20vw, 330px) minmax(0, 1fr) clamp(330px, 25vw, 430px);
+  gap: clamp(12px, 1.3vw, 20px);
+  height: 100dvh;
+  min-height: 0;
+  padding: clamp(10px, 1.2vw, 18px);
+  overflow: hidden;
 }
 
 .panel {
+  min-width: 0;
+  min-height: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -162,12 +167,15 @@ button {
 .roster-panel,
 .data-panel,
 .workspace-panel {
-  padding: 22px;
+  padding: clamp(16px, 1.5vw, 22px);
 }
 
 .roster-panel {
   position: relative;
-  padding-bottom: 86px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100%;
+  overflow: hidden;
 }
 
 .brand {
@@ -269,14 +277,22 @@ textarea:focus {
 
 .student-list {
   display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
   gap: 12px;
+  min-height: 0;
+  margin-right: -8px;
+  padding-right: 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .help-open {
-  position: absolute;
-  left: 22px;
-  right: 22px;
-  bottom: 22px;
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  margin-top: 18px;
   min-height: 48px;
   color: var(--button-text);
   border-radius: 18px;
@@ -288,7 +304,9 @@ textarea:focus {
 
 .student-card {
   position: relative;
+  min-height: 74px;
   padding: 14px;
+  flex: 0 0 auto;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--field);
@@ -314,6 +332,7 @@ textarea:focus {
   grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
+  min-height: 44px;
 }
 
 .student-pick {
@@ -495,6 +514,47 @@ th {
   display: grid;
   align-content: start;
   gap: 0;
+  height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.workspace-panel {
+  height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.workspace-panel,
+.student-list,
+.data-panel,
+.help-card {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 45%, transparent) transparent;
+}
+
+.workspace-panel::-webkit-scrollbar,
+.student-list::-webkit-scrollbar,
+.data-panel::-webkit-scrollbar,
+.help-card::-webkit-scrollbar {
+  width: 10px;
+}
+
+.workspace-panel::-webkit-scrollbar-thumb,
+.student-list::-webkit-scrollbar-thumb,
+.data-panel::-webkit-scrollbar-thumb,
+.help-card::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 42%, transparent);
+  background-clip: padding-box;
+}
+
+.workspace-panel::-webkit-scrollbar-track,
+.student-list::-webkit-scrollbar-track,
+.data-panel::-webkit-scrollbar-track,
+.help-card::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .button-grid {
@@ -561,6 +621,8 @@ textarea {
 
 .help-card {
   padding: 24px;
+  max-height: min(780px, calc(100vh - 32px));
+  overflow: auto;
   background: var(--panel);
   backdrop-filter: blur(20px);
 }
@@ -622,27 +684,112 @@ textarea {
   line-height: 1.7;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1280px) {
   .app-shell {
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: clamp(248px, 26vw, 300px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
   .data-panel {
     grid-column: 1 / -1;
     grid-template-columns: repeat(3, 1fr);
     gap: 18px;
+    height: auto;
+    max-height: 38dvh;
+  }
+
+  .workspace-panel {
+    min-width: 0;
   }
 }
 
-@media (max-width: 860px) {
-  .app-shell,
-  .data-panel,
-  .settings-grid,
-  .lesson-form {
+@media (max-width: 920px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .roster-panel,
+  .workspace-panel,
+  .data-panel {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .roster-panel {
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .student-list {
+    max-height: min(420px, 46dvh);
+  }
+
+  .data-panel {
     grid-template-columns: 1fr;
   }
 
+  .settings-grid,
+  .lesson-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .wide {
-    grid-column: auto;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  :root {
+    --radius: 22px;
+  }
+
+  body {
+    font-size: 15px;
+  }
+
+  .app-shell {
+    padding: 10px;
+  }
+
+  .section-head,
+  .lesson-title,
+  .help-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbar {
+    width: 100%;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .theme-picker,
+  .save-state {
+    width: 100%;
+  }
+
+  .settings-grid,
+  .lesson-form,
+  .button-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-wrap {
+    margin-inline: -10px;
+    padding-inline: 10px;
+  }
+
+  th,
+  td {
+    padding: 10px 8px;
+    font-size: 14px;
   }
 }
