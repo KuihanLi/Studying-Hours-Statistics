@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>学时统计系统</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="grain"></div>
+    <main class="app-shell">
+      <aside class="panel roster-panel">
+        <div class="brand">
+          <span class="brand-mark">课</span>
+          <div>
+            <p>Study Ledger</p>
+            <h1>学时统计</h1>
+          </div>
+        </div>
+
+        <form id="studentForm" class="add-student">
+          <input id="studentName" type="text" placeholder="新增学员姓名" autocomplete="off" required />
+          <button type="submit">新增</button>
+        </form>
+
+        <div id="studentList" class="student-list" aria-label="学员列表"></div>
+
+        <button id="helpOpen" class="help-open" type="button">？ 使用说明</button>
+      </aside>
+
+      <section class="panel workspace-panel">
+        <header class="section-head">
+          <div>
+            <p>Operation</p>
+            <h2 id="activeStudentTitle">选择或新增学员</h2>
+          </div>
+          <div class="toolbar">
+            <label class="theme-picker">
+              <span>配色</span>
+              <select id="themeMode" aria-label="选择配色模式">
+                <option value="parchment">暖纸</option>
+                <option value="clarity">清透</option>
+                <option value="forest">森绿</option>
+                <option value="ink">墨夜</option>
+              </select>
+            </label>
+            <span id="saveState" class="save-state">本地缓存已启用</span>
+          </div>
+        </header>
+
+        <section class="settings-grid">
+          <label>
+            <span>授课科目</span>
+            <input id="subjects" type="text" value="综合能力、导论" />
+          </label>
+          <label>
+            <span>总学时（小时）</span>
+            <input id="totalHours" type="number" min="0" step="0.01" value="37" />
+          </label>
+          <label>
+            <span>购买节数（45mins/节）</span>
+            <input id="lessonUnits" type="number" min="0" step="0.01" value="49.33" />
+          </label>
+          <label>
+            <span>下次上课时间</span>
+            <input id="nextClassTime" type="text" value="明天晚上6.25" />
+          </label>
+        </section>
+
+        <section class="lesson-card">
+          <div class="lesson-title">
+            <div>
+              <p>New Session</p>
+              <h3>增加新课时统计</h3>
+            </div>
+            <span id="convertedPreview">总计：0 分钟 / 0 小时</span>
+          </div>
+
+          <form id="lessonForm" class="lesson-form">
+            <label>
+              <span>上课日期</span>
+              <input id="lessonDate" type="date" required />
+            </label>
+            <label>
+              <span>小时 H</span>
+              <input id="durationHours" type="number" min="0" step="1" placeholder="1" />
+            </label>
+            <label>
+              <span>分钟 M</span>
+              <input id="durationMinutes" type="number" min="0" max="59" step="1" placeholder="30" />
+            </label>
+            <label>
+              <span>总计显示</span>
+              <input id="durationTotal" type="text" value="0 分钟 / 0 小时" readonly />
+            </label>
+            <label class="wide">
+              <span>授课内容</span>
+              <input id="lessonContent" type="text" value="半章" />
+            </label>
+            <button type="submit" class="primary-action">记录课时</button>
+          </form>
+        </section>
+
+        <section class="history-card">
+          <div class="lesson-title">
+            <div>
+              <p>History</p>
+              <h3>课时记录</h3>
+            </div>
+            <button id="clearLessons" class="ghost-button" type="button">清空当前学员记录</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>日期</th>
+                  <th>课次</th>
+                  <th>分钟</th>
+                  <th>小时</th>
+                  <th>剩余</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="lessonTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <aside class="panel data-panel">
+        <section class="data-block">
+          <div class="section-head compact">
+            <div>
+              <p>Data</p>
+              <h2>表格导入导出</h2>
+            </div>
+          </div>
+          <div class="button-grid">
+            <button id="exportXlsx" type="button">导出 XLSX</button>
+            <label class="file-button">
+              导入 XLSX
+              <input id="importXlsx" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+            </label>
+            <button id="exportCsv" type="button">导出 CSV</button>
+            <label class="file-button">
+              导入 CSV
+              <input id="importCsv" type="file" accept=".csv,text/csv" />
+            </label>
+            <button id="exportJson" type="button">导出 JSON</button>
+            <label class="file-button">
+              导入 JSON
+              <input id="importJson" type="file" accept="application/json,.json" />
+            </label>
+          </div>
+          <p class="hint">左侧导出，右侧导入；JSON 保存完整本地数据。</p>
+        </section>
+
+        <section class="data-block stats-block">
+          <div class="section-head compact">
+            <div>
+              <p>Copy</p>
+              <h2>统计语句导出</h2>
+            </div>
+            <button id="copySummary" type="button" class="ghost-button">复制</button>
+          </div>
+          <textarea id="summaryText" readonly></textarea>
+        </section>
+
+        <section class="data-block feedback-block">
+          <div class="section-head compact">
+            <div>
+              <p>Feedback</p>
+              <h2>学情反馈模板</h2>
+            </div>
+            <button id="copyFeedback" type="button" class="ghost-button">复制</button>
+          </div>
+          <textarea id="feedbackText" readonly></textarea>
+        </section>
+      </aside>
+    </main>
+
+    <dialog id="helpDialog" class="help-dialog">
+      <div class="help-card">
+        <div class="help-head">
+          <div>
+            <p>Guide</p>
+            <h2>使用说明</h2>
+          </div>
+          <button id="helpClose" class="tiny-button" type="button" aria-label="关闭帮助">×</button>
+        </div>
+
+        <ol class="help-steps">
+          <li>
+            <strong>新增人员</strong>
+            <span>在左侧输入学员姓名，点击“新增”。学员卡片会显示已上课时、总学时和剩余学时进度。</span>
+          </li>
+          <li>
+            <strong>设置资料</strong>
+            <span>选择学员后，在中间设置授课科目、总学时、购买节数和下次上课时间。修改后自动保存到本地缓存。</span>
+          </li>
+          <li>
+            <strong>增加课时条目</strong>
+            <span>选择上课日期，按小时 H、分钟 M 填写本次课时，系统自动换算总分钟 / 总小时，并按“第n节”自动编号。</span>
+          </li>
+          <li>
+            <strong>查看与删除记录</strong>
+            <span>下方课时记录会按顺序显示每节课用时和剩余课时。单条可删除，也可清空当前学员记录。</span>
+          </li>
+          <li>
+            <strong>导出 / 导入表格</strong>
+            <span>右侧左列为导出，右列为导入。XLSX / CSV 适合表格查看和交接。</span>
+          </li>
+          <li>
+            <strong>JSON 备份缓存</strong>
+            <span>JSON 是完整备份，包含全部学员、设置和课时。换浏览器、清缓存或部署前，先导出 JSON；恢复时导入 JSON。</span>
+          </li>
+          <li>
+            <strong>复制反馈文本</strong>
+            <span>右侧会自动生成统计语句和学情反馈模板，点击“复制”即可发送给学生确认。</span>
+          </li>
+        </ol>
+      </div>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
