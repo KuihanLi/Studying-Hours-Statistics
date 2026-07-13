@@ -16,6 +16,7 @@ let state = loadState();
 const elements = {
   studentForm: document.querySelector("#studentForm"),
   studentName: document.querySelector("#studentName"),
+  studentCount: document.querySelector("#studentCount"),
   studentList: document.querySelector("#studentList"),
   helpOpen: document.querySelector("#helpOpen"),
   helpDialog: document.querySelector("#helpDialog"),
@@ -23,6 +24,9 @@ const elements = {
   activeStudentTitle: document.querySelector("#activeStudentTitle"),
   themeMode: document.querySelector("#themeMode"),
   saveState: document.querySelector("#saveState"),
+  overviewUsed: document.querySelector("#overviewUsed"),
+  overviewRemaining: document.querySelector("#overviewRemaining"),
+  overviewSessions: document.querySelector("#overviewSessions"),
   subjects: document.querySelector("#subjects"),
   totalHours: document.querySelector("#totalHours"),
   lessonUnits: document.querySelector("#lessonUnits"),
@@ -110,6 +114,7 @@ function bindEvents() {
     const minutes = getDurationMinutes();
     if (minutes <= 0) {
       flash("请输入有效课时时长");
+      elements.durationHours.focus();
       return;
     }
     student.lessons.push(
@@ -129,6 +134,7 @@ function bindEvents() {
   elements.clearLessons.addEventListener("click", () => {
     const student = getActiveStudent();
     if (!student) return;
+    if (!confirm(`确认清空“${student.name}”的全部课时记录？此操作无法撤销。`)) return;
     student.lessons = [];
     commit();
   });
@@ -157,6 +163,7 @@ function render() {
 
 function renderStudents() {
   elements.studentList.innerHTML = "";
+  elements.studentCount.textContent = `${state.students.length} 人`;
   state.students.forEach((student) => {
     const used = getUsedHours(student);
     const progress = student.totalHours ? Math.min(100, (used / student.totalHours) * 100) : 0;
@@ -166,13 +173,13 @@ function renderStudents() {
     card.innerHTML = `
       <div class="student-progress"></div>
       <div class="student-content">
-        <button class="student-pick" type="button" aria-label="选择 ${escapeHtml(student.name)}">
+        <button class="student-pick" type="button" aria-label="选择 ${escapeHtml(student.name)}" ${student.id === state.activeStudentId ? 'aria-current="true"' : ""}>
           <strong>${escapeHtml(student.name)}</strong>
           <small>${formatHours(used)} / ${formatHours(student.totalHours)} · 剩 ${formatHours(getRemainingHours(student))}</small>
         </button>
         <div class="student-actions">
-          <button class="tiny-button rename" type="button" title="改名">✎</button>
-          <button class="tiny-button delete" type="button" title="删除">×</button>
+          <button class="tiny-button rename" type="button" title="改名" aria-label="修改 ${escapeHtml(student.name)} 的姓名">✎</button>
+          <button class="tiny-button delete danger" type="button" title="删除" aria-label="删除学员 ${escapeHtml(student.name)}">×</button>
         </div>
       </div>
     `;
@@ -187,6 +194,7 @@ function renderStudents() {
       commit();
     });
     card.querySelector(".delete").addEventListener("click", () => {
+      if (!confirm(`确认删除学员“${student.name}”及其全部课时？此操作无法撤销。`)) return;
       state.students = state.students.filter((item) => item.id !== student.id);
       state.activeStudentId = state.students[0]?.id || "";
       commit();
@@ -214,13 +222,23 @@ function renderActiveStudent() {
   ].forEach((input) => {
     input.disabled = disabled;
   });
+  elements.lessonForm.querySelector("button[type='submit']").disabled = disabled;
+  elements.clearLessons.disabled = disabled || !student?.lessons.length;
+  elements.copySummary.disabled = disabled;
+  elements.copyFeedback.disabled = disabled;
 
   if (!student) {
     elements.activeStudentTitle.textContent = "选择或新增学员";
+    elements.overviewUsed.textContent = "0小时";
+    elements.overviewRemaining.textContent = "0小时";
+    elements.overviewSessions.textContent = "0 节";
     return;
   }
 
   elements.activeStudentTitle.textContent = `${student.name} · 剩余 ${formatHours(getRemainingHours(student))}`;
+  elements.overviewUsed.textContent = formatHours(getUsedHours(student));
+  elements.overviewRemaining.textContent = formatHours(getRemainingHours(student));
+  elements.overviewSessions.textContent = `${student.lessons.length} 节`;
   elements.subjects.value = student.subjects;
   elements.totalHours.value = round2(student.totalHours);
   elements.lessonUnits.value = round2(student.lessonUnits);
@@ -246,9 +264,10 @@ function renderLessons() {
       <td>${lesson.minutes}</td>
       <td>${formatHours(lesson.minutes / 60)}</td>
       <td>${formatHours(Math.max(0, remaining))}</td>
-      <td><button class="tiny-button delete-lesson" type="button">×</button></td>
+      <td><button class="tiny-button delete-lesson danger" type="button" aria-label="删除${escapeHtml(getLessonTitle(index))}">×</button></td>
     `;
     row.querySelector(".delete-lesson").addEventListener("click", () => {
+      if (!confirm(`确认删除${getLessonTitle(index)}？`)) return;
       student.lessons.splice(index, 1);
       commit();
     });
@@ -387,6 +406,7 @@ function exportJson() {
 function importJson(event) {
   const file = event.target.files[0];
   if (!file) return;
+  if (!confirmImport(event)) return;
   readFile(file).then((text) => {
     const imported = JSON.parse(text);
     if (!Array.isArray(imported.students)) throw new Error("JSON 缺少 students");
@@ -399,6 +419,7 @@ function importJson(event) {
 function importCsv(event) {
   const file = event.target.files[0];
   if (!file) return;
+  if (!confirmImport(event)) return;
   readFile(file).then((text) => {
     importRows(parseCsv(text), file.name.replace(/\.csv$/i, ""));
     event.target.value = "";
@@ -408,12 +429,19 @@ function importCsv(event) {
 function importXlsx(event) {
   const file = event.target.files[0];
   if (!file) return;
+  if (!confirmImport(event)) return;
   readArrayBuffer(file).then((buffer) => readXlsxRows(buffer))
     .then((rows) => {
       importRows(rows, file.name.replace(/\.xlsx$/i, ""));
       event.target.value = "";
     })
     .catch((error) => flash(`导入失败：${error.message}`));
+}
+
+function confirmImport(event) {
+  const accepted = confirm("导入会覆盖当前全部学员与课时数据。建议先导出 JSON 备份，是否继续？");
+  if (!accepted) event.target.value = "";
+  return accepted;
 }
 
 function importRows(rows, fallbackName) {
@@ -716,9 +744,13 @@ function downloadBlob(filename, blob) {
 
 function copyText(text) {
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => flash("已复制"));
+    navigator.clipboard.writeText(text).then(() => flash("已复制")).catch(() => copyTextFallback(text));
     return;
   }
+  copyTextFallback(text);
+}
+
+function copyTextFallback(text) {
   const field = document.createElement("textarea");
   field.value = text;
   document.body.appendChild(field);

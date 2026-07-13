@@ -4,31 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>学时统计系统</title>
-    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./style.css?v=20260713" />
   </head>
   <body>
+    <a class="skip-link" href="#mainContent">跳到主要操作区</a>
     <div class="grain"></div>
-    <main class="app-shell">
-      <aside class="panel roster-panel">
+    <main id="mainContent" class="app-shell" tabindex="-1">
+      <aside class="panel roster-panel" aria-labelledby="rosterTitle">
         <div class="brand">
-          <span class="brand-mark">课</span>
+          <span class="brand-mark" aria-hidden="true">课</span>
           <div>
             <p>Study Ledger</p>
-            <h1>学时统计</h1>
+            <h1 id="rosterTitle">学时统计</h1>
           </div>
         </div>
 
         <form id="studentForm" class="add-student">
-          <input id="studentName" type="text" placeholder="新增学员姓名" autocomplete="off" required />
+          <label class="sr-only" for="studentName">学员姓名</label>
+          <input id="studentName" name="studentName" type="text" placeholder="输入学员姓名…" autocomplete="off" maxlength="30" required />
           <button type="submit">新增</button>
         </form>
 
-        <div id="studentList" class="student-list" aria-label="学员列表"></div>
+        <div class="roster-meta">
+          <span>学员列表</span>
+          <strong id="studentCount">0 人</strong>
+        </div>
+        <div id="studentList" class="student-list" aria-label="学员列表" aria-live="polite"></div>
 
         <button id="helpOpen" class="help-open" type="button">？ 使用说明</button>
       </aside>
 
-      <section class="panel workspace-panel">
+      <section class="panel workspace-panel" aria-labelledby="activeStudentTitle">
         <header class="section-head">
           <div>
             <p>Operation</p>
@@ -44,27 +50,51 @@
                 <option value="ink">墨夜</option>
               </select>
             </label>
-            <span id="saveState" class="save-state">本地缓存已启用</span>
+            <span id="saveState" class="save-state" role="status" aria-live="polite">本地缓存已启用</span>
           </div>
         </header>
 
-        <section class="settings-grid">
+        <section class="overview-strip" aria-label="当前学员课时概览">
+          <article class="overview-item used">
+            <span>累计课时</span>
+            <strong id="overviewUsed">0小时</strong>
+          </article>
+          <article class="overview-item remaining">
+            <span>剩余课时</span>
+            <strong id="overviewRemaining">0小时</strong>
+          </article>
+          <article class="overview-item sessions">
+            <span>已上课次</span>
+            <strong id="overviewSessions">0 节</strong>
+          </article>
+        </section>
+
+        <section class="settings-card" aria-labelledby="settingsTitle">
+          <div class="subsection-head">
+            <div>
+              <p>Profile</p>
+              <h3 id="settingsTitle">课程资料</h3>
+            </div>
+            <span>修改后自动保存</span>
+          </div>
+          <div class="settings-grid">
           <label>
             <span>授课科目</span>
-            <input id="subjects" type="text" value="综合能力、导论" />
+            <input id="subjects" name="subjects" type="text" value="综合能力、导论" autocomplete="off" />
           </label>
           <label>
             <span>总学时（小时）</span>
-            <input id="totalHours" type="number" min="0" step="0.01" value="37" />
+            <input id="totalHours" name="totalHours" type="number" min="0" step="0.01" value="37" inputmode="decimal" autocomplete="off" />
           </label>
           <label>
             <span>购买节数（45mins/节）</span>
-            <input id="lessonUnits" type="number" min="0" step="0.01" value="49.33" />
+            <input id="lessonUnits" name="lessonUnits" type="number" min="0" step="0.01" value="49.33" inputmode="decimal" autocomplete="off" />
           </label>
           <label>
             <span>下次上课时间</span>
-            <input id="nextClassTime" type="text" value="明天晚上6.25" />
+            <input id="nextClassTime" name="nextClassTime" type="text" value="明天晚上6.25" autocomplete="off" />
           </label>
+          </div>
         </section>
 
         <section class="lesson-card">
@@ -73,31 +103,31 @@
               <p>New Session</p>
               <h3>增加新课时统计</h3>
             </div>
-            <span id="convertedPreview">总计：0 分钟 / 0 小时</span>
+            <output id="convertedPreview" aria-live="polite">总计：0 分钟 / 0 小时</output>
           </div>
 
           <form id="lessonForm" class="lesson-form">
             <label>
               <span>上课日期</span>
-              <input id="lessonDate" type="date" required />
+              <input id="lessonDate" name="lessonDate" type="date" autocomplete="off" required />
             </label>
             <label>
               <span>小时 H</span>
-              <input id="durationHours" type="number" min="0" step="1" placeholder="1" />
+              <input id="durationHours" name="durationHours" type="number" min="0" step="1" placeholder="例如 1…" inputmode="numeric" autocomplete="off" />
             </label>
             <label>
               <span>分钟 M</span>
-              <input id="durationMinutes" type="number" min="0" max="59" step="1" placeholder="30" />
+              <input id="durationMinutes" name="durationMinutes" type="number" min="0" max="59" step="1" placeholder="例如 30…" inputmode="numeric" autocomplete="off" />
             </label>
             <label>
               <span>总计显示</span>
-              <input id="durationTotal" type="text" value="0 分钟 / 0 小时" readonly />
+              <input id="durationTotal" name="durationTotal" type="text" value="0 分钟 / 0 小时" readonly />
             </label>
             <label class="wide">
               <span>授课内容</span>
-              <input id="lessonContent" type="text" value="半章" />
+              <input id="lessonContent" name="lessonContent" type="text" value="半章" autocomplete="off" />
             </label>
-            <button type="submit" class="primary-action">记录课时</button>
+            <button type="submit" class="primary-action"><span aria-hidden="true">＋</span> 记录课时</button>
           </form>
         </section>
 
@@ -127,7 +157,7 @@
         </section>
       </section>
 
-      <aside class="panel data-panel">
+      <aside class="panel data-panel" aria-label="数据导入导出与反馈文本">
         <section class="data-block">
           <div class="section-head compact">
             <div>
@@ -135,21 +165,22 @@
               <h2>表格导入导出</h2>
             </div>
           </div>
+          <div class="transfer-labels" aria-hidden="true"><span>导出</span><span>导入</span></div>
           <div class="button-grid">
             <button id="exportXlsx" type="button">导出 XLSX</button>
             <label class="file-button">
               导入 XLSX
-              <input id="importXlsx" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+              <input id="importXlsx" name="importXlsx" type="file" aria-label="导入 XLSX 文件" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
             </label>
             <button id="exportCsv" type="button">导出 CSV</button>
             <label class="file-button">
               导入 CSV
-              <input id="importCsv" type="file" accept=".csv,text/csv" />
+              <input id="importCsv" name="importCsv" type="file" aria-label="导入 CSV 文件" accept=".csv,text/csv" />
             </label>
             <button id="exportJson" type="button">导出 JSON</button>
             <label class="file-button">
               导入 JSON
-              <input id="importJson" type="file" accept="application/json,.json" />
+              <input id="importJson" name="importJson" type="file" aria-label="导入 JSON 备份" accept="application/json,.json" />
             </label>
           </div>
           <p class="hint">左侧导出，右侧导入；JSON 保存完整本地数据。</p>
@@ -163,7 +194,7 @@
             </div>
             <button id="copySummary" type="button" class="ghost-button">复制</button>
           </div>
-          <textarea id="summaryText" readonly></textarea>
+          <textarea id="summaryText" aria-label="统计语句" readonly></textarea>
         </section>
 
         <section class="data-block feedback-block">
@@ -174,17 +205,17 @@
             </div>
             <button id="copyFeedback" type="button" class="ghost-button">复制</button>
           </div>
-          <textarea id="feedbackText" readonly></textarea>
+          <textarea id="feedbackText" aria-label="学情反馈模板" readonly></textarea>
         </section>
       </aside>
     </main>
 
-    <dialog id="helpDialog" class="help-dialog">
+    <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
       <div class="help-card">
         <div class="help-head">
           <div>
             <p>Guide</p>
-            <h2>使用说明</h2>
+            <h2 id="helpTitle">使用说明</h2>
           </div>
           <button id="helpClose" class="tiny-button" type="button" aria-label="关闭帮助">×</button>
         </div>
@@ -222,6 +253,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js"></script>
+    <script src="./app.js?v=20260713"></script>
   </body>
 </html>
