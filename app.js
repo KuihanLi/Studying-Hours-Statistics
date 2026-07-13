@@ -87,16 +87,35 @@ function bindEvents() {
     commit();
   });
 
-  [elements.subjects, elements.totalHours, elements.lessonUnits, elements.nextClassTime].forEach((input) => {
+  [elements.subjects, elements.nextClassTime].forEach((input) => {
     input.addEventListener("input", () => {
       const student = getActiveStudent();
       if (!student) return;
       student.subjects = elements.subjects.value.trim();
-      student.totalHours = toNumber(elements.totalHours.value);
-      student.lessonUnits = toNumber(elements.lessonUnits.value);
       student.nextClassTime = elements.nextClassTime.value.trim();
-      commit();
+      saveState();
+      renderExports();
     });
+  });
+
+  elements.totalHours.addEventListener("input", () => {
+    const student = getActiveStudent();
+    const totalHours = readDecimalInput(elements.totalHours);
+    if (!student || totalHours === null) return;
+    student.totalHours = totalHours;
+    student.lessonUnits = round2(totalHours / 0.75);
+    elements.lessonUnits.value = student.lessonUnits;
+    saveProfileMetrics();
+  });
+
+  elements.lessonUnits.addEventListener("input", () => {
+    const student = getActiveStudent();
+    const lessonUnits = readDecimalInput(elements.lessonUnits);
+    if (!student || lessonUnits === null) return;
+    student.lessonUnits = lessonUnits;
+    student.totalHours = round2(lessonUnits * 0.75);
+    elements.totalHours.value = student.totalHours;
+    saveProfileMetrics();
   });
 
   elements.themeMode.addEventListener("change", () => {
@@ -229,20 +248,38 @@ function renderActiveStudent() {
 
   if (!student) {
     elements.activeStudentTitle.textContent = "选择或新增学员";
+    renderOverview(null);
+    return;
+  }
+
+  renderOverview(student);
+  elements.subjects.value = student.subjects;
+  elements.totalHours.value = round2(student.totalHours);
+  elements.lessonUnits.value = round2(student.lessonUnits);
+  elements.nextClassTime.value = student.nextClassTime;
+}
+
+function renderOverview(student) {
+  if (!student) {
     elements.overviewUsed.textContent = "0小时";
     elements.overviewRemaining.textContent = "0小时";
     elements.overviewSessions.textContent = "0 节";
     return;
   }
-
   elements.activeStudentTitle.textContent = `${student.name} · 剩余 ${formatHours(getRemainingHours(student))}`;
   elements.overviewUsed.textContent = formatHours(getUsedHours(student));
   elements.overviewRemaining.textContent = formatHours(getRemainingHours(student));
   elements.overviewSessions.textContent = `${student.lessons.length} 节`;
-  elements.subjects.value = student.subjects;
-  elements.totalHours.value = round2(student.totalHours);
-  elements.lessonUnits.value = round2(student.lessonUnits);
-  elements.nextClassTime.value = student.nextClassTime;
+}
+
+function saveProfileMetrics() {
+  const student = getActiveStudent();
+  if (!student) return;
+  saveState();
+  renderOverview(student);
+  renderStudents();
+  renderLessons();
+  renderExports();
 }
 
 function renderLessons() {
@@ -806,6 +843,12 @@ function formatToday() {
 function toNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function readDecimalInput(input) {
+  if (input.value === "") return null;
+  const value = Number(input.value);
+  return Number.isFinite(value) ? Math.max(0, value) : null;
 }
 
 function round2(value) {
