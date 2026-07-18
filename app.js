@@ -11,7 +11,12 @@ const defaultState = {
   students: [],
 };
 
-let state = loadState();
+let state = normaliseState(loadState());
+let editingLessonId = "";
+const analysisRange = {
+  from: "",
+  to: "",
+};
 
 const elements = {
   studentForm: document.querySelector("#studentForm"),
@@ -37,8 +42,13 @@ const elements = {
   durationMinutes: document.querySelector("#durationMinutes"),
   durationTotal: document.querySelector("#durationTotal"),
   lessonContent: document.querySelector("#lessonContent"),
+  lessonStartTime: document.querySelector("#lessonStartTime"),
   convertedPreview: document.querySelector("#convertedPreview"),
   clearLessons: document.querySelector("#clearLessons"),
+  filterDateFrom: document.querySelector("#filterDateFrom"),
+  filterDateTo: document.querySelector("#filterDateTo"),
+  resetDateFilter: document.querySelector("#resetDateFilter"),
+  analysisStatus: document.querySelector("#analysisStatus"),
   lessonTable: document.querySelector("#lessonTable"),
   exportXlsx: document.querySelector("#exportXlsx"),
   exportCsv: document.querySelector("#exportCsv"),
@@ -50,6 +60,15 @@ const elements = {
   summaryText: document.querySelector("#summaryText"),
   copyFeedback: document.querySelector("#copyFeedback"),
   feedbackText: document.querySelector("#feedbackText"),
+  editLessonDialog: document.querySelector("#editLessonDialog"),
+  editLessonForm: document.querySelector("#editLessonForm"),
+  editLessonClose: document.querySelector("#editLessonClose"),
+  editLessonCancel: document.querySelector("#editLessonCancel"),
+  editLessonDate: document.querySelector("#editLessonDate"),
+  editLessonStartTime: document.querySelector("#editLessonStartTime"),
+  editDurationHours: document.querySelector("#editDurationHours"),
+  editDurationMinutes: document.querySelector("#editDurationMinutes"),
+  editLessonContent: document.querySelector("#editLessonContent"),
 };
 
 initialise();
@@ -142,12 +161,39 @@ function bindEvents() {
         elements.lessonDate.value || todayISO(),
         Math.round(minutes),
         elements.lessonContent.value.trim() || "半章",
+        elements.lessonStartTime.value,
       ),
     );
     elements.durationHours.value = "";
     elements.durationMinutes.value = "";
+    elements.lessonStartTime.value = "";
+    elements.lessonStartTime.closest("details").open = false;
     syncDurationTotal();
     commit();
+  });
+
+  [elements.filterDateFrom, elements.filterDateTo].forEach((input) => {
+    input.addEventListener("change", () => {
+      analysisRange.from = elements.filterDateFrom.value;
+      analysisRange.to = elements.filterDateTo.value;
+      if (analysisRange.from && analysisRange.to && analysisRange.from > analysisRange.to) {
+        [analysisRange.from, analysisRange.to] = [analysisRange.to, analysisRange.from];
+        elements.filterDateFrom.value = analysisRange.from;
+        elements.filterDateTo.value = analysisRange.to;
+        flash("已自动调整日期范围");
+      }
+      renderLessons();
+      renderExports();
+    });
+  });
+
+  elements.resetDateFilter.addEventListener("click", () => {
+    analysisRange.from = "";
+    analysisRange.to = "";
+    elements.filterDateFrom.value = "";
+    elements.filterDateTo.value = "";
+    renderLessons();
+    renderExports();
   });
 
   elements.clearLessons.addEventListener("click", () => {
@@ -171,6 +217,12 @@ function bindEvents() {
   elements.helpDialog.addEventListener("click", (event) => {
     if (event.target === elements.helpDialog) elements.helpDialog.close();
   });
+  elements.editLessonClose.addEventListener("click", closeLessonEditor);
+  elements.editLessonCancel.addEventListener("click", closeLessonEditor);
+  elements.editLessonDialog.addEventListener("click", (event) => {
+    if (event.target === elements.editLessonDialog) closeLessonEditor();
+  });
+  elements.editLessonForm.addEventListener("submit", saveLessonEdit);
 }
 
 function render() {
@@ -238,11 +290,15 @@ function renderActiveStudent() {
     elements.durationHours,
     elements.durationMinutes,
     elements.lessonContent,
+    elements.lessonStartTime,
+    elements.filterDateFrom,
+    elements.filterDateTo,
   ].forEach((input) => {
     input.disabled = disabled;
   });
   elements.lessonForm.querySelector("button[type='submit']").disabled = disabled;
   elements.clearLessons.disabled = disabled || !student?.lessons.length;
+  elements.resetDateFilter.disabled = disabled || (!analysisRange.from && !analysisRange.to);
   elements.copySummary.disabled = disabled;
   elements.copyFeedback.disabled = disabled;
 
@@ -286,30 +342,99 @@ function renderLessons() {
   const student = getActiveStudent();
   elements.lessonTable.innerHTML = "";
   if (!student?.lessons.length) {
-    elements.lessonTable.innerHTML = `<tr><td colspan="6" class="empty-state">暂无课时记录</td></tr>`;
+    elements.analysisStatus.textContent = "暂无记录";
+    elements.lessonTable.innerHTML = `<tr><td colspan="7" class="empty-state">暂无课时记录</td></tr>`;
     return;
   }
 
+  const sortedLessons = getSortedLessons(student);
+  const filteredLessons = sortedLessons.filter(isLessonInAnalysisRange);
+  const includedLessons = filteredLessons.filter((lesson) => !lesson.excluded);
+  const lessonIndex = new Map(sortedLessons.map((lesson, index) => [lesson.id, index]));
+  const remainingById = new Map();
   let usedMinutes = 0;
-  student.lessons.forEach((lesson, index) => {
+  sortedLessons.forEach((lesson) => {
     usedMinutes += lesson.minutes;
-    const remaining = student.totalHours - usedMinutes / 60;
+    remainingById.set(lesson.id, Math.max(0, student.totalHours - usedMinutes / 60));
+  });
+
+  elements.analysisStatus.textContent = `${formatAnalysisRange()} · 显示 ${filteredLessons.length} 条，计入 ${includedLessons.length} 条 / ${formatHours(sumLessonMinutes(includedLessons) / 60)}`;
+  elements.resetDateFilter.disabled = !analysisRange.from && !analysisRange.to;
+
+  if (!filteredLessons.length) {
+    elements.lessonTable.innerHTML = `<tr><td colspan="7" class="empty-state">该时间段内暂无课时记录</td></tr>`;
+    return;
+  }
+
+  filteredLessons.forEach((lesson) => {
+    const index = lessonIndex.get(lesson.id) || 0;
     const row = document.createElement("tr");
+    row.className = lesson.excluded ? "lesson-excluded" : "";
     row.innerHTML = `
-      <td>${escapeHtml(lesson.date)}</td>
+      <td class="date-time-cell"><strong>${escapeHtml(lesson.date)}</strong><small>${lesson.startTime ? escapeHtml(lesson.startTime) : "按录入时间排序"}</small></td>
       <td>${escapeHtml(getLessonTitle(index))}</td>
-      <td>${lesson.minutes}</td>
-      <td>${formatHours(lesson.minutes / 60)}</td>
-      <td>${formatHours(Math.max(0, remaining))}</td>
-      <td><button class="tiny-button delete-lesson danger" type="button" aria-label="删除${escapeHtml(getLessonTitle(index))}">×</button></td>
+      <td class="duration-cell"><strong>${formatHours(lesson.minutes / 60)}</strong><small>${lesson.minutes} 分钟</small></td>
+      <td class="lesson-content" title="${escapeHtml(lesson.content)}">${escapeHtml(lesson.content)}</td>
+      <td>${formatHours(remainingById.get(lesson.id) || 0)}</td>
+      <td><button class="analysis-toggle" type="button" aria-pressed="${!lesson.excluded}" aria-label="${lesson.excluded ? "恢复计入" : "排除"}${escapeHtml(getLessonTitle(index))}的分析">${lesson.excluded ? "已排除" : "计入"}</button></td>
+      <td><div class="row-actions"><button class="tiny-button edit-lesson" type="button" aria-label="修改${escapeHtml(getLessonTitle(index))}">✎</button><button class="tiny-button delete-lesson danger" type="button" aria-label="删除${escapeHtml(getLessonTitle(index))}">×</button></div></td>
     `;
+    row.querySelector(".analysis-toggle").addEventListener("click", () => {
+      lesson.excluded = !lesson.excluded;
+      commit();
+    });
+    row.querySelector(".edit-lesson").addEventListener("click", () => openLessonEditor(lesson.id));
     row.querySelector(".delete-lesson").addEventListener("click", () => {
       if (!confirm(`确认删除${getLessonTitle(index)}？`)) return;
-      student.lessons.splice(index, 1);
+      student.lessons = student.lessons.filter((item) => item.id !== lesson.id);
       commit();
     });
     elements.lessonTable.appendChild(row);
   });
+}
+
+function openLessonEditor(lessonId) {
+  const lesson = getActiveStudent()?.lessons.find((item) => item.id === lessonId);
+  if (!lesson) return;
+  editingLessonId = lesson.id;
+  elements.editLessonDate.value = lesson.date;
+  elements.editLessonStartTime.value = lesson.startTime;
+  elements.editDurationHours.value = Math.floor(lesson.minutes / 60) || "";
+  elements.editDurationMinutes.value = lesson.minutes % 60 || "";
+  elements.editLessonContent.value = lesson.content;
+  elements.editLessonDialog.showModal();
+}
+
+function closeLessonEditor() {
+  editingLessonId = "";
+  elements.editLessonDialog.close();
+}
+
+function saveLessonEdit(event) {
+  event.preventDefault();
+  const lesson = getActiveStudent()?.lessons.find((item) => item.id === editingLessonId);
+  if (!lesson) return;
+  const minutes = getEditDurationMinutes();
+  if (minutes <= 0) {
+    flash("请输入有效课时时长");
+    elements.editDurationHours.focus();
+    return;
+  }
+  lesson.date = elements.editLessonDate.value || todayISO();
+  lesson.startTime = elements.editLessonStartTime.value;
+  lesson.minutes = minutes;
+  lesson.content = elements.editLessonContent.value.trim() || "半章";
+  closeLessonEditor();
+  commit();
+}
+
+function getEditDurationMinutes() {
+  const hours = Math.max(0, Math.floor(toNumber(elements.editDurationHours.value)));
+  const minutes = Math.max(0, Math.min(59, Math.floor(toNumber(elements.editDurationMinutes.value))));
+  if (elements.editDurationMinutes.value && Number(elements.editDurationMinutes.value) > 59) {
+    elements.editDurationMinutes.value = 59;
+  }
+  return hours * 60 + minutes;
 }
 
 function renderExports() {
@@ -319,21 +444,23 @@ function renderExports() {
     elements.feedbackText.value = "";
     return;
   }
+  const analysisLessons = getAnalysisLessons(student);
   const total = formatHours(student.totalHours);
-  const used = formatHours(getUsedHours(student));
-  const remaining = formatHours(getRemainingHours(student));
-  const latest = student.lessons.at(-1);
+  const used = formatHours(sumLessonMinutes(analysisLessons) / 60);
+  const remaining = formatHours(Math.max(0, student.totalHours - sumLessonMinutes(analysisLessons) / 60));
+  const latest = analysisLessons.at(-1);
   const latestHours = latest ? formatHours(latest.minutes / 60) : "0小时";
-  const lessonIndex = student.lessons.length || 1;
+  const lessonIndex = latest ? getSortedLessons(student).findIndex((lesson) => lesson.id === latest.id) : -1;
+  const latestSchedule = latest ? `${latest.date}${latest.startTime ? ` ${latest.startTime}` : ""}` : "暂无计入分析的课时";
 
-  elements.summaryText.value = `总时长${round2(student.lessonUnits)}节课，45mins/节，总共${total}；已上${used}，剩余${remaining}。`;
+  elements.summaryText.value = `分析范围：${formatAnalysisRange()}；计入${analysisLessons.length}节课，共${used}。总时长${round2(student.lessonUnits)}节课，45mins/节，总共${total}；按当前分析剩余${remaining}。`;
   elements.feedbackText.value = `（总时长${round2(student.lessonUnits)}节课，45mins/节，总共${round2(student.totalHours)}h）
 学情反馈模板：
 1、时间：${formatToday()}
 2、授课科目：${student.subjects || "综合能力、导论"}
 3、授课形式：腾讯一对一
 4、授课内容：${latest?.content || elements.lessonContent.value || "半章"}
-5、课次：${latestHours} ${getLessonTitle(lessonIndex - 1)}
+5、课次：${latest ? `${latestHours} ${getLessonTitle(lessonIndex)}（${latestSchedule}）` : latestSchedule}
 6、累计课时：${used}
 7、剩余课时：${remaining}
 8、下次上课时间：${student.nextClassTime || "明天晚上6.25"}
@@ -368,13 +495,15 @@ function createStudent(name) {
   };
 }
 
-function createLesson(title, date, minutes, content) {
+function createLesson(title, date, minutes, content, startTime = "") {
   return {
     id: createId(),
     title,
     date,
     minutes,
     content,
+    startTime: normaliseTime(startTime),
+    excluded: false,
     createdAt: new Date().toISOString(),
   };
 }
@@ -384,7 +513,7 @@ function getActiveStudent() {
 }
 
 function getUsedHours(student) {
-  return student.lessons.reduce((sum, lesson) => sum + lesson.minutes, 0) / 60;
+  return sumLessonMinutes(student.lessons) / 60;
 }
 
 function getRemainingHours(student) {
@@ -395,20 +524,61 @@ function getLessonTitle(index) {
   return `第${index + 1}节`;
 }
 
+function getSortedLessons(student) {
+  return [...student.lessons].sort((first, second) => {
+    const dateOrder = first.date.localeCompare(second.date);
+    if (dateOrder) return dateOrder;
+    if (!first.startTime && !second.startTime) return first.createdAt.localeCompare(second.createdAt);
+    const timeOrder = getLessonSortTime(first).localeCompare(getLessonSortTime(second));
+    if (timeOrder) return timeOrder;
+    return first.createdAt.localeCompare(second.createdAt);
+  });
+}
+
+function getLessonSortTime(lesson) {
+  if (lesson.startTime) return `${lesson.startTime}:00.000`;
+  const createdAt = new Date(lesson.createdAt);
+  if (Number.isNaN(createdAt.getTime())) return "23:59:59.999";
+  return [createdAt.getHours(), createdAt.getMinutes(), createdAt.getSeconds()]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+}
+
+function getAnalysisLessons(student) {
+  return getSortedLessons(student).filter((lesson) => isLessonInAnalysisRange(lesson) && !lesson.excluded);
+}
+
+function isLessonInAnalysisRange(lesson) {
+  if (analysisRange.from && lesson.date < analysisRange.from) return false;
+  if (analysisRange.to && lesson.date > analysisRange.to) return false;
+  return true;
+}
+
+function formatAnalysisRange() {
+  if (analysisRange.from && analysisRange.to) return `${analysisRange.from} 至 ${analysisRange.to}`;
+  if (analysisRange.from) return `${analysisRange.from} 起`;
+  if (analysisRange.to) return `截至 ${analysisRange.to}`;
+  return "全部时间";
+}
+
+function sumLessonMinutes(lessons) {
+  return lessons.reduce((sum, lesson) => sum + toNumber(lesson.minutes), 0);
+}
+
 function exportCsv() {
   const rows = getTabularRows();
-  downloadFile("学时统计.csv", rows.map((row) => row.map(csvCell).join(",")).join("\n"), "text/csv;charset=utf-8");
+  return downloadFile("学时统计.csv", rows.map((row) => row.map(csvCell).join(",")).join("\n"), "text/csv;charset=utf-8");
 }
 
 function getTabularRows() {
-  const header = ["student", "totalHours", "lessonUnits", "subjects", "nextClassTime", "date", "title", "minutes", "hours", "left", "content"];
+  const header = ["student", "totalHours", "lessonUnits", "subjects", "nextClassTime", "date", "startTime", "title", "minutes", "hours", "left", "content", "excluded", "createdAt"];
   const rows = [header];
   state.students.forEach((student) => {
     let usedMinutes = 0;
     if (!student.lessons.length) {
-      rows.push([student.name, student.totalHours, student.lessonUnits, student.subjects, student.nextClassTime, "", "", "", "", student.totalHours, ""]);
+      rows.push([student.name, student.totalHours, student.lessonUnits, student.subjects, student.nextClassTime, "", "", "", "", "", student.totalHours, "", "", ""]);
     }
-    student.lessons.forEach((lesson, lessonIndex) => {
+    getSortedLessons(student).forEach((lesson, lessonIndex) => {
       usedMinutes += lesson.minutes;
       rows.push([
         student.name,
@@ -417,11 +587,14 @@ function getTabularRows() {
         student.subjects,
         student.nextClassTime,
         lesson.date,
+        lesson.startTime,
         getLessonTitle(lessonIndex),
         lesson.minutes,
         round2(lesson.minutes / 60),
         round2(Math.max(0, student.totalHours - usedMinutes / 60)),
         lesson.content,
+        lesson.excluded ? "true" : "false",
+        lesson.createdAt,
       ]);
     });
   });
@@ -433,11 +606,11 @@ function exportXlsx() {
   const blob = new Blob([createZip(files)], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  downloadBlob("学时统计.xlsx", blob);
+  return downloadBlob("学时统计.xlsx", blob);
 }
 
 function exportJson() {
-  downloadFile("学时统计.json", JSON.stringify(state, null, 2), "application/json");
+  return downloadFile("学时统计.json", JSON.stringify(state, null, 2), "application/json");
 }
 
 function importJson(event) {
@@ -447,7 +620,7 @@ function importJson(event) {
   readFile(file).then((text) => {
     const imported = JSON.parse(text);
     if (!Array.isArray(imported.students)) throw new Error("JSON 缺少 students");
-    state = imported;
+    state = normaliseState(imported);
     commit();
     event.target.value = "";
   }).catch((error) => flash(`导入失败：${error.message}`));
@@ -513,7 +686,16 @@ function importStandardRows(rows) {
     const student = students.get(name);
     const minutes = toNumber(record[index.minutes]);
     if (minutes > 0) {
-      student.lessons.push(createLesson(getLessonTitle(student.lessons.length), record[index.date] || todayISO(), minutes, record[index.content] || "半章"));
+      const lesson = createLesson(
+        getLessonTitle(student.lessons.length),
+        record[index.date] || todayISO(),
+        minutes,
+        record[index.content] || "半章",
+        record[index.startTime] || "",
+      );
+      lesson.excluded = parseBoolean(record[index.excluded]);
+      lesson.createdAt = normaliseCreatedAt(record[index.createdAt], lesson.createdAt);
+      student.lessons.push(lesson);
     }
   });
   state.students = Array.from(students.values());
@@ -767,16 +949,40 @@ function readArrayBuffer(file) {
 
 function downloadFile(filename, content, type) {
   const blob = new Blob(["\ufeff", content], { type });
-  downloadBlob(filename, blob);
+  return downloadBlob(filename, blob);
 }
 
-function downloadBlob(filename, blob) {
+async function downloadBlob(filename, blob) {
+  const file = typeof File === "function" ? new File([blob], filename, { type: blob.type }) : null;
+  const mobileDevice = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1;
+  if (mobileDevice && file && navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: `导出 ${filename}`,
+      });
+      flash("已打开系统保存 / 分享面板");
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        flash("已取消导出");
+        return;
+      }
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => {
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, 30000);
+  flash("文件已开始下载");
 }
 
 function copyText(text) {
@@ -813,6 +1019,50 @@ function loadState() {
   } catch {
     return structuredClone(defaultState);
   }
+}
+
+function normaliseState(candidate) {
+  const source = candidate && typeof candidate === "object" ? candidate : structuredClone(defaultState);
+  const students = Array.isArray(source.students) ? source.students.map((student, studentIndex) => {
+    const lessons = Array.isArray(student.lessons) ? student.lessons.map((lesson, lessonIndex) => ({
+      id: lesson.id || createId(),
+      title: lesson.title || getLessonTitle(lessonIndex),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(lesson.date || "") ? lesson.date : todayISO(),
+      minutes: Math.max(0, Math.round(toNumber(lesson.minutes))),
+      content: String(lesson.content || "半章"),
+      startTime: normaliseTime(lesson.startTime),
+      excluded: parseBoolean(lesson.excluded),
+      createdAt: normaliseCreatedAt(lesson.createdAt, new Date(studentIndex * 100000 + lessonIndex).toISOString()),
+    })).filter((lesson) => lesson.minutes > 0) : [];
+    const parsedTotalHours = Number(student.totalHours);
+    const totalHours = Number.isFinite(parsedTotalHours) ? Math.max(0, parsedTotalHours) : 37;
+    const parsedLessonUnits = Number(student.lessonUnits);
+    return {
+      id: student.id || createId(),
+      name: String(student.name || `学员${studentIndex + 1}`),
+      subjects: String(student.subjects || "综合能力、导论"),
+      totalHours,
+      lessonUnits: Number.isFinite(parsedLessonUnits) ? Math.max(0, parsedLessonUnits) : round2(totalHours / 0.75),
+      nextClassTime: String(student.nextClassTime || "明天晚上6.25"),
+      lessons,
+    };
+  }) : [];
+  const activeStudentId = students.some((student) => student.id === source.activeStudentId) ? source.activeStudentId : students[0]?.id || "";
+  return { activeStudentId, students };
+}
+
+function normaliseTime(value) {
+  const text = String(value || "");
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(text) ? text : "";
+}
+
+function normaliseCreatedAt(value, fallback) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : date.toISOString();
+}
+
+function parseBoolean(value) {
+  return value === true || String(value).toLowerCase() === "true" || String(value) === "1";
 }
 
 function flash(message) {

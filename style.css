@@ -675,9 +675,89 @@ label span {
   grid-column: span 3;
 }
 
+.form-full {
+  grid-column: 1 / -1;
+}
+
+.lesson-time-details {
+  border: 1px dashed var(--line-strong);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--field) 72%, transparent);
+  overflow: hidden;
+}
+
+.lesson-time-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 14px;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  list-style: none;
+  touch-action: manipulation;
+}
+
+.lesson-time-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.lesson-time-details summary::after {
+  color: var(--accent);
+  content: "＋";
+  font-size: 18px;
+}
+
+.lesson-time-details[open] summary::after {
+  content: "－";
+}
+
+.lesson-time-details summary span {
+  margin: 0 auto 0 8px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.lesson-time-details label {
+  display: block;
+  max-width: 240px;
+  padding: 0 14px 14px;
+}
+
 .primary-action {
   min-height: 44px;
   align-self: end;
+}
+
+.analysis-toolbar {
+  display: grid;
+  grid-template-columns: minmax(140px, 180px) minmax(140px, 180px) auto minmax(180px, 1fr);
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--field) 72%, transparent);
+}
+
+.analysis-toolbar input {
+  height: 42px;
+}
+
+.analysis-toolbar .ghost-button {
+  min-height: 42px;
+}
+
+.analysis-status {
+  align-self: center;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 750;
+  line-height: 1.45;
+  text-align: right;
 }
 
 .ghost-button {
@@ -695,6 +775,7 @@ label span {
 
 table {
   width: 100%;
+  min-width: 850px;
   border-collapse: collapse;
   font-size: 15px;
   font-variant-numeric: tabular-nums;
@@ -715,6 +796,58 @@ th {
 
 tbody tr:hover {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.date-time-cell strong,
+.date-time-cell small,
+.duration-cell strong,
+.duration-cell small {
+  display: block;
+}
+
+.date-time-cell small,
+.duration-cell small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.lesson-content {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.analysis-toggle {
+  min-width: 58px;
+  min-height: 32px;
+  color: var(--green);
+  border: 1px solid color-mix(in srgb, var(--green) 28%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.analysis-toggle[aria-pressed="false"] {
+  color: var(--muted);
+  border-style: dashed;
+  background: transparent;
+}
+
+.lesson-excluded {
+  opacity: 0.42;
+}
+
+.lesson-excluded:hover,
+.lesson-excluded:focus-within {
+  opacity: 0.72;
 }
 
 .data-panel {
@@ -852,6 +985,48 @@ textarea {
   overscroll-behavior: contain;
 }
 
+.edit-dialog {
+  width: min(680px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 0;
+  background: transparent;
+  box-shadow: var(--shadow);
+  overscroll-behavior: contain;
+}
+
+.edit-dialog::backdrop {
+  background: rgba(20, 18, 14, 0.52);
+  backdrop-filter: blur(8px);
+}
+
+.edit-card {
+  padding: 24px;
+  background: var(--panel);
+  backdrop-filter: blur(20px);
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.edit-actions .primary-action,
+.edit-actions .ghost-button {
+  min-height: 44px;
+  padding: 0 18px;
+}
+
 .help-dialog::backdrop {
   background: rgba(20, 18, 14, 0.48);
   backdrop-filter: blur(8px);
@@ -979,6 +1154,15 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .analysis-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analysis-status {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
   .wide {
     grid-column: 1 / -1;
   }
@@ -1018,6 +1202,24 @@ textarea {
   .lesson-form,
   .button-grid {
     grid-template-columns: 1fr;
+  }
+
+  .analysis-toolbar,
+  .edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-status {
+    grid-column: auto;
+  }
+
+  .edit-card {
+    padding: 18px;
+  }
+
+  .edit-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .overview-strip {

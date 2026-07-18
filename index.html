@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>学时统计系统</title>
-    <link rel="stylesheet" href="./style.css?v=20260713" />
+    <link rel="stylesheet" href="./style.css?v=20260718" />
   </head>
   <body>
     <a class="skip-link" href="#mainContent">跳到主要操作区</a>
@@ -129,6 +129,13 @@
               <input id="lessonContent" name="lessonContent" type="text" value="半章" autocomplete="off" />
             </label>
             <button type="submit" class="primary-action"><span aria-hidden="true">＋</span> 记录课时</button>
+            <details class="lesson-time-details form-full">
+              <summary>详细上课时间 <span>可选，默认折叠</span></summary>
+              <label for="lessonStartTime">
+                <span>开始时间</span>
+                <input id="lessonStartTime" name="lessonStartTime" type="time" autocomplete="off" />
+              </label>
+            </details>
           </form>
         </section>
 
@@ -140,15 +147,28 @@
             </div>
             <button id="clearLessons" class="ghost-button" type="button">清空当前学员记录</button>
           </div>
+          <div class="analysis-toolbar" aria-label="学习记录时间筛选">
+            <label>
+              <span>开始日期</span>
+              <input id="filterDateFrom" name="filterDateFrom" type="date" autocomplete="off" />
+            </label>
+            <label>
+              <span>结束日期</span>
+              <input id="filterDateTo" name="filterDateTo" type="date" autocomplete="off" />
+            </label>
+            <button id="resetDateFilter" class="ghost-button" type="button">显示全部</button>
+            <output id="analysisStatus" class="analysis-status" aria-live="polite">全部记录</output>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>日期</th>
+                  <th>日期 / 时间</th>
                   <th>课次</th>
-                  <th>分钟</th>
-                  <th>小时</th>
+                  <th>时长</th>
+                  <th>授课内容</th>
                   <th>剩余</th>
+                  <th>分析</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -232,11 +252,11 @@
           </li>
           <li>
             <strong>增加课时条目</strong>
-            <span>选择上课日期，按小时 H、分钟 M 填写本次课时，系统自动换算总分钟 / 总小时，并按“第n节”自动编号。</span>
+            <span>选择上课日期，按小时 H、分钟 M 填写本次课时；详细开始时间默认折叠，可按需填写。记录会按日期与时间自动排序。</span>
           </li>
           <li>
-            <strong>查看与删除记录</strong>
-            <span>下方课时记录会按顺序显示每节课用时和剩余课时。单条可删除，也可清空当前学员记录。</span>
+            <strong>编辑与分析记录</strong>
+            <span>课时可修改、删除或排除分析。排除后的记录会弱化显示，不影响真实余额，也不进入右侧统计文本；还可按日期范围筛选。</span>
           </li>
           <li>
             <strong>导出 / 导入表格</strong>
@@ -254,6 +274,44 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=20260713"></script>
+    <dialog id="editLessonDialog" class="edit-dialog" aria-labelledby="editLessonTitle">
+      <form id="editLessonForm" class="edit-card">
+        <div class="help-head">
+          <div>
+            <p>Edit Session</p>
+            <h2 id="editLessonTitle">修改课时记录</h2>
+          </div>
+          <button id="editLessonClose" class="tiny-button" type="button" aria-label="关闭修改课时弹窗">×</button>
+        </div>
+        <div class="edit-grid">
+          <label>
+            <span>上课日期</span>
+            <input id="editLessonDate" name="editLessonDate" type="date" autocomplete="off" required />
+          </label>
+          <label>
+            <span>详细开始时间</span>
+            <input id="editLessonStartTime" name="editLessonStartTime" type="time" autocomplete="off" />
+          </label>
+          <label>
+            <span>小时 H</span>
+            <input id="editDurationHours" name="editDurationHours" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" />
+          </label>
+          <label>
+            <span>分钟 M</span>
+            <input id="editDurationMinutes" name="editDurationMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" autocomplete="off" />
+          </label>
+          <label class="form-full">
+            <span>授课内容</span>
+            <input id="editLessonContent" name="editLessonContent" type="text" autocomplete="off" />
+          </label>
+        </div>
+        <div class="edit-actions">
+          <button id="editLessonCancel" class="ghost-button" type="button">取消</button>
+          <button class="primary-action" type="submit">保存修改</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./app.js?v=20260718"></script>
   </body>
 </html>
